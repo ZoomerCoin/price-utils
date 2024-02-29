@@ -1,9 +1,9 @@
 // fallback values
 export const nativePrices: Record<string, number> = {
-  ethereum: 2350.22,
-  "matic-network": 1.01,
-  solana: 98,
-  binancecoin: 304.33,
+  ethereum: 3465.98,
+  "matic-network": 1.04,
+  solana: 130.13,
+  binancecoin: 406.59,
 };
 
 export const updateNative = async () => {

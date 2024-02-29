@@ -21,11 +21,7 @@ export const getPrices = async (
       if (!nativePrices[token.nativeAssetId]) {
         throw new Error("No native price exists");
       }
-      const { price, supply: chainSupply } = await getPrice(
-        token,
-        nativePrices[token.nativeAssetId],
-        wagmiConfig
-      );
+      const { price, supply: chainSupply } = await getPrice(token, wagmiConfig);
       const pctOfSupply = new BigNumber(chainSupply.toString())
         .dividedBy(new BigNumber(ZOOMER_MULTICHAIN.totalSupply.toString()))
         .multipliedBy(100)

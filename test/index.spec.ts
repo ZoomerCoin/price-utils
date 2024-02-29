@@ -1,11 +1,11 @@
 import { expect, test, describe } from "bun:test";
 import { createConfig, fallback, http } from "wagmi";
-import { arbitrum, polygon, optimism, mainnet, bsc } from "wagmi/chains";
+import { arbitrum, polygon, optimism, mainnet, bsc, base } from "wagmi/chains";
 
-import { getPrices } from "../src/index";
+import { getPrices, updateNative } from "../src/index";
 
 const wagmiConfig = createConfig({
-  chains: [mainnet, polygon, arbitrum, optimism, bsc],
+  chains: [mainnet, polygon, arbitrum, optimism, bsc, base],
   transports: {
     [mainnet.id]: fallback([
       http("https://eth.llamarpc.com"),
@@ -37,13 +37,17 @@ const wagmiConfig = createConfig({
       http(`https://bsc-dataseed2.ninicoin.io`),
       http(`https://bsc-dataseed3.ninicoin.io`),
     ]),
+    [base.id]: fallback([
+      http("https://mainnet.base.org"),
+      http("https://base.llamarpc.com"),
+    ]),
   },
 });
 
 describe("integration test", () => {
   test("should pass", async () => {
     const prices = await getPrices(wagmiConfig);
-    console.log("prices: ", prices);
+    console.log("prices: ", { ...prices, tokens: [] });
     expect(prices).toBeDefined();
   });
 });

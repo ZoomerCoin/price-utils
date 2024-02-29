@@ -1,25 +1,11 @@
-import { Token, WETH9, CurrencyAmount } from "@uniswap/sdk-core";
-import { Pair, Route } from "@uniswap/v2-sdk";
 import BigNumber from "bignumber.js";
 import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
-import { LIQUIDITY_STATE_LAYOUT_V4 } from "@raydium-io/raydium-sdk";
-import { OpenOrders } from "@project-serum/serum";
-import { FeeAmount, computePoolAddress, tickToPrice } from "@uniswap/v3-sdk";
-import { ERC20Token, WBNB } from "@pancakeswap/sdk";
+import { FeeAmount } from "@uniswap/v3-sdk";
 import type { Config } from "wagmi";
-import { arbitrum, bsc, mainnet, optimism, polygon } from "viem/chains";
+import { arbitrum, base, bsc, mainnet, optimism, polygon } from "viem/chains";
 
-import {
-  readErc20TotalSupply,
-  readPairGetReserves,
-  readPancakeV3PoolObserve,
-  readUniV3PoolObserve,
-} from "./generated";
+import { readErc20TotalSupply } from "./generated";
 import { Address, Chain } from "viem";
-import {
-  SERUM_OPENBOOK_PROGRAM_ID,
-  UNIV3_POOL_FACTORY_CONTRACT_ADDRESS,
-} from "./constants";
 
 export const solana: Chain = {
   id: 0,
@@ -139,10 +125,24 @@ export const ZOOMER_MULTICHAIN: MultichainToken = {
       poolAddress: "0x2D272d0ae2fDd6dEd99Cc5A5bcaa03eAeAA8E51d",
       feeAmount: FeeAmount.HIGH,
     },
+    {
+      chain: base,
+      address: "0xD1dB4851bcF5B41442cAA32025Ce0Afe6B8EabC2",
+      decimals: 18,
+      dex: "aero",
+      nativeAssetId: "ethereum",
+      dexScreener:
+        "https://dexscreener.com/base/0x45d8c7bf5be7c99d39cdc724f60497bd79546458",
+      dexTools:
+        "https://www.dextools.io/app/en/base/pair-explorer/0x45d8c7bf5be7c99d39cdc724f60497bd79546458?t=1709214216013",
+      buy: "https://aerodrome.finance/swap?from=0x940181a94a35a4569e4529a3cdfb74e38fd98631&to=0xd1db4851bcf5b41442caa32025ce0afe6b8eabc2",
+      otherToken: "0x940181a94A35A4569E4529A3CDfB74e38FD98631",
+      pair: "0x45D8c7BF5be7c99D39cDC724f60497BD79546458",
+    },
   ],
 };
 
-export type Dex = "univ2" | "univ3" | "raydium" | "pancakev3";
+export type Dex = "univ2" | "univ3" | "raydium" | "pancakev3" | "aero";
 
 export type TokenConfig = {
   chain: Chain;
@@ -157,225 +157,26 @@ export type TokenConfig = {
   isCanonical?: boolean;
   ammId?: string;
   poolAddress?: Address;
+  otherToken?: string;
+  pair?: string;
 };
 
 export const getPrice = async (
   token: TokenConfig,
-  nativeUsd: number,
   wagmiConfig: Config
 ): Promise<{ price: BigNumber; supply: bigint }> => {
-  switch (token.dex) {
-    case "univ2":
-      return getUniv2Price(token, nativeUsd, wagmiConfig);
-    case "univ3":
-      return getUniV3Price(token, nativeUsd, wagmiConfig);
-    case "pancakev3":
-      return getPancakeV3Price(token, nativeUsd, wagmiConfig);
-    case "raydium":
-      return getRaydiumPrice(token, nativeUsd, wagmiConfig);
+  const _price = await fetch(
+    `https://api.dexscreener.com/latest/dex/pairs/${token.dexScreener.split("/").slice(-2).join("/")}`
+  );
+  const price = await _price.json();
+  let supply: bigint;
+  if (token.chain.id === solana.id) {
+    let connection = new Connection(clusterApiUrl("mainnet-beta"), "confirmed");
+    supply = await getSupplySolana(connection, token);
+  } else {
+    supply = await getSupplyEvm(token, wagmiConfig);
   }
-};
-
-const getUniv2Price = async (
-  token: TokenConfig,
-  nativeUsdPrice: number,
-  wagmiConfig: Config
-): Promise<{ price: BigNumber; supply: bigint }> => {
-  const ZOOMER = new Token(token.chain.id, token.address, token.decimals);
-  const pairAddress = Pair.getAddress(ZOOMER, WETH9[ZOOMER.chainId]);
-
-  const reserves = await readPairGetReserves(wagmiConfig, {
-    address: pairAddress as Address,
-  });
-  const [reserve0, reserve1] = reserves;
-
-  const tokens = [ZOOMER, WETH9[ZOOMER.chainId]];
-  const [token0, token1] = tokens[0].sortsBefore(tokens[1])
-    ? tokens
-    : [tokens[1], tokens[0]];
-
-  const pair = new Pair(
-    CurrencyAmount.fromRawAmount(token0, reserve0.toString()),
-    CurrencyAmount.fromRawAmount(token1, reserve1.toString())
-  );
-
-  const route = new Route([pair], WETH9[ZOOMER.chainId], ZOOMER);
-  const price2 = route.midPrice.invert().toSignificant(6);
-  const price = new BigNumber(price2).times(nativeUsdPrice);
-
-  const supply = await getSupplyEvm(token, wagmiConfig);
-  return { price, supply };
-};
-
-const getUniV3Price = async (
-  token: TokenConfig,
-  nativeUsdPrice: number,
-  wagmiConfig: Config
-): Promise<{ price: BigNumber; supply: bigint }> => {
-  const zoomer = new Token(
-    token.chain.id,
-    token.address,
-    token.decimals,
-    "ZOOMER",
-    "ZoomerCoin"
-  );
-
-  if (!token.feeAmount) {
-    throw new Error("Fee amount not set");
-  }
-  const currentPoolAddress = computePoolAddress({
-    factoryAddress: UNIV3_POOL_FACTORY_CONTRACT_ADDRESS,
-    tokenA: WETH9[token.chain.id],
-    tokenB: zoomer,
-    fee: token.feeAmount,
-  }) as Address;
-
-  const timestamps = [0, 1];
-  const [tickCumulatives, secondsPerLiquidityCumulatives] =
-    await readUniV3PoolObserve(wagmiConfig, {
-      chainId: token.chain.id as any,
-      address: currentPoolAddress,
-      args: [timestamps],
-    });
-
-  const observations = timestamps.map((time, i) => {
-    return {
-      secondsAgo: time,
-      tickCumulative: BigInt(tickCumulatives[i]),
-      secondsPerLiquidityCumulativeX128: BigInt(
-        secondsPerLiquidityCumulatives[i]
-      ),
-    };
-  });
-  const diffTickCumulative =
-    observations[0].tickCumulative - observations[1].tickCumulative;
-  const secondsBetween = 1n;
-
-  const averageTick = diffTickCumulative / secondsBetween;
-  const TWAP = tickToPrice(
-    zoomer,
-    WETH9[token.chain.id],
-    Number(averageTick.toString())
-  );
-  const price = new BigNumber(TWAP.toSignificant(6)).multipliedBy(
-    nativeUsdPrice
-  );
-
-  const supply = await getSupplyEvm(token, wagmiConfig);
-
-  return { price, supply };
-};
-
-const getPancakeV3Price = async (
-  token: TokenConfig,
-  nativeUsdPrice: number,
-  wagmiConfig: Config
-): Promise<{ price: BigNumber; supply: bigint }> => {
-  const zoomer = new ERC20Token(
-    token.chain.id,
-    token.address as Address,
-    token.decimals,
-    "ZOOMER",
-    "ZoomerCoin"
-  );
-
-  if (!token.feeAmount) {
-    throw new Error("Fee amount not set");
-  }
-
-  if (!token.poolAddress) {
-    throw new Error("Pool address not set");
-  }
-
-  const timestamps = [0, 1];
-  const [tickCumulatives, secondsPerLiquidityCumulatives] =
-    await readPancakeV3PoolObserve(wagmiConfig, {
-      chainId: token.chain.id as any,
-      address: token.poolAddress,
-      args: [timestamps],
-    });
-
-  const observations = timestamps.map((time, i) => {
-    return {
-      secondsAgo: time,
-      tickCumulative: BigInt(tickCumulatives[i]),
-      secondsPerLiquidityCumulativeX128: BigInt(
-        secondsPerLiquidityCumulatives[i]
-      ),
-    };
-  });
-  const diffTickCumulative =
-    observations[0].tickCumulative - observations[1].tickCumulative;
-  const secondsBetween = 1n;
-
-  const averageTick = diffTickCumulative / secondsBetween;
-  const TWAP = tickToPrice(
-    zoomer,
-    WBNB[token.chain.id as keyof typeof WBNB],
-    Number(averageTick.toString())
-  );
-  const price = new BigNumber(TWAP.toSignificant(6)).multipliedBy(
-    nativeUsdPrice
-  );
-
-  const supply = await getSupplyEvm(token, wagmiConfig);
-
-  return { price, supply };
-};
-
-const getRaydiumPrice = async (
-  token: TokenConfig,
-  nativeUsdPrice: number,
-  _wagmiConfig: Config
-): Promise<{ price: BigNumber; supply: bigint }> => {
-  if (!token.ammId) {
-    throw new Error("AMM ID not set");
-  }
-
-  // code from https://github.com/raydium-io/raydium-sdk
-  let connection = new Connection(clusterApiUrl("mainnet-beta"), "confirmed");
-  const info = await connection.getAccountInfo(new PublicKey(token.ammId));
-  if (!info) {
-    throw new Error("Failed to find pool");
-  }
-  const poolState = LIQUIDITY_STATE_LAYOUT_V4.decode(info.data);
-  const openOrders = await OpenOrders.load(
-    connection,
-    poolState.openOrders,
-    new PublicKey(SERUM_OPENBOOK_PROGRAM_ID) // OPENBOOK_PROGRAM_ID(marketProgramId)
-  );
-
-  const baseDecimal = 10 ** poolState.baseDecimal.toNumber(); // e.g. 10 ^ 6
-  const quoteDecimal = 10 ** poolState.quoteDecimal.toNumber();
-
-  const baseTokenAmount = await connection.getTokenAccountBalance(
-    poolState.baseVault
-  );
-  const quoteTokenAmount = await connection.getTokenAccountBalance(
-    poolState.quoteVault
-  );
-
-  const basePnl = poolState.baseNeedTakePnl.toNumber() / baseDecimal;
-  const quotePnl = poolState.quoteNeedTakePnl.toNumber() / quoteDecimal;
-
-  const openOrdersBaseTokenTotal =
-    openOrders.baseTokenTotal.toNumber() / baseDecimal;
-  const openOrdersQuoteTokenTotal =
-    openOrders.quoteTokenTotal.toNumber() / quoteDecimal;
-
-  const base =
-    (baseTokenAmount.value?.uiAmount || 0) + openOrdersBaseTokenTotal - basePnl;
-  const quote =
-    (quoteTokenAmount.value?.uiAmount || 0) +
-    openOrdersQuoteTokenTotal -
-    quotePnl;
-
-  const baseInQuote = new BigNumber(base).dividedBy(quote);
-  const price = baseInQuote.multipliedBy(nativeUsdPrice);
-
-  const supply = await getSupplySolana(connection, token);
-
-  return { price, supply };
+  return { price: new BigNumber(price.pair.priceUsd), supply };
 };
 
 const getSupplyEvm = async (
