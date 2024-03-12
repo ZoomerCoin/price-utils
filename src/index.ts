@@ -18,10 +18,13 @@ export const getPrices = async (
   let nonCanonicalSupply = 0;
   const pricedTokens: TokenWithPrice[] = await Promise.all(
     ZOOMER_MULTICHAIN.tokens.map(async (token): Promise<TokenWithPrice> => {
-      if (!nativePrices[token.nativeAssetId]) {
-        throw new Error("No native price exists");
-      }
-      const { price, supply: chainSupply } = await getPrice(token, wagmiConfig);
+      const {
+        price,
+        supply: chainSupply,
+        liquidity,
+        volume24h,
+        priceChange24h,
+      } = await getPrice(token, wagmiConfig);
       const pctOfSupply = new BigNumber(chainSupply.toString())
         .dividedBy(new BigNumber(ZOOMER_MULTICHAIN.totalSupply.toString()))
         .multipliedBy(100)
@@ -35,6 +38,9 @@ export const getPrices = async (
         price,
         pctOfSupply: Number(pctOfSupply),
         chainSupply: Number(chainSupply),
+        liquidity,
+        volume24h,
+        priceChange24h,
       };
     })
   );
@@ -58,7 +64,15 @@ export const getPrices = async (
 
   pricedTokens.forEach((token) => {
     console.log(
-      `Token: ${token.address} - Price: ${token.price} - Chain: ${token.chain.name} - Deviation: ${token.pctDeviation} - Supply: ${token.chainSupply} - Pct of Supply: ${token.pctOfSupply}`
+      `Token: ${token.address}
+      Price: ${token.price}
+      Chain: ${token.chain.name}
+      Deviation: ${token.pctDeviation}
+      Supply: ${token.chainSupply}
+      Pct of Supply: ${token.pctOfSupply}
+      Liquidity: ${token.liquidity}
+      Volume 24h: ${token.volume24h}
+      Price Change 24h: ${token.priceChange24h}`
     );
   });
 
