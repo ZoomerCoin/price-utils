@@ -6,7 +6,8 @@
   "private": false,
   "scripts": {
     "generate": "wagmi generate",
-    "build": "bun run build.mjs"
+    "build": "bun run build.mjs",
+    "test": "bun test"
   },
   "files": [
     "src"

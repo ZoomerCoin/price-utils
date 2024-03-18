@@ -1,7 +1,6 @@
 import BigNumber from "bignumber.js";
 import { Config } from "wagmi";
 
-import { nativePrices } from "./native";
 import {
   PricedMultichainToken,
   TokenWithPrice,
@@ -93,7 +92,7 @@ export const getPrices = async (
       .toNumber()
       .toLocaleString()
       .split(".")[0],
-    tokens: filtered,
+    tokens: pricedTokens,
   };
   return multi;
 };
