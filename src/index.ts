@@ -13,11 +13,18 @@ export * from "./prices";
 export * from "./native";
 
 export const getPrices = async (
-  wagmiConfig: Config
+  wagmiConfig: Config,
+  chains?: number[]
 ): Promise<PricedMultichainToken> => {
   let nonCanonicalSupply = 0;
+  const filtered = chains
+    ? ZOOMER_MULTICHAIN.tokens.filter((token) =>
+        chains.includes(token.chain.id)
+      )
+    : ZOOMER_MULTICHAIN.tokens;
+
   const pricedTokens: TokenWithPrice[] = await Promise.all(
-    ZOOMER_MULTICHAIN.tokens.map(async (token): Promise<TokenWithPrice> => {
+    filtered.map(async (token): Promise<TokenWithPrice> => {
       const {
         price,
         supply: chainSupply,
@@ -86,7 +93,7 @@ export const getPrices = async (
       .toNumber()
       .toLocaleString()
       .split(".")[0],
-    tokens: pricedTokens,
+    tokens: filtered,
   };
   return multi;
 };

@@ -1,11 +1,26 @@
 import { expect, test, describe } from "bun:test";
 import { createConfig, fallback, http } from "wagmi";
-import { arbitrum, polygon, optimism, mainnet, bsc, base } from "wagmi/chains";
+import {
+  arbitrum,
+  polygon,
+  optimism,
+  mainnet,
+  bsc,
+  base,
+  Chain,
+} from "wagmi/chains";
 
-import { getPrices, updateNative } from "../src/index";
-
+import { getPrices, solana } from "../src/index";
+const chains: [Chain, ...Chain[]] = [
+  mainnet,
+  polygon,
+  arbitrum,
+  optimism,
+  bsc,
+  base,
+];
 const wagmiConfig = createConfig({
-  chains: [mainnet, polygon, arbitrum, optimism, bsc, base],
+  chains,
   transports: {
     [mainnet.id]: fallback([
       http("https://eth.llamarpc.com"),
@@ -45,9 +60,26 @@ const wagmiConfig = createConfig({
 });
 
 describe("integration test", () => {
-  test("should pass", async () => {
+  test("should work for all chains", async () => {
     const prices = await getPrices(wagmiConfig);
-    console.log("prices: ", { ...prices, tokens: [] });
     expect(prices).toBeDefined();
+    expect(prices.tokens.length).toBe(chains.length + 1); // add 1 for solana
+    chains.forEach((chain) => {
+      expect(
+        prices.tokens.find((token) => token.chain.id === chain.id)
+      ).toBeDefined();
+    });
+  });
+
+  test("should filter chains", async () => {
+    const _chains = [mainnet.id, base.id, solana.id];
+    const prices = await getPrices(wagmiConfig, _chains);
+    expect(prices).toBeDefined();
+    expect(prices.tokens.length).toBe(_chains.length);
+    _chains.forEach((chain) => {
+      expect(
+        prices.tokens.find((token) => token.chain.id === chain)
+      ).toBeDefined();
+    });
   });
 });
