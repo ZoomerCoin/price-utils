@@ -1,6 +1,5 @@
 import BigNumber from "bignumber.js";
 import { Connection, PublicKey, clusterApiUrl } from "@solana/web3.js";
-import { FeeAmount } from "@uniswap/v3-sdk";
 import type { Config } from "wagmi";
 import { arbitrum, base, bsc, mainnet, optimism, polygon } from "viem/chains";
 
@@ -97,9 +96,9 @@ export const ZOOMER_MULTICHAIN: MultichainToken = {
       chain: solana,
       address: "nBZEcHSG771mRbi4y2sSgKjfDUH8jsM2Eo5fNcASLeU",
       dexScreener:
-        "https://dexscreener.com/solana/ce47qs8rckspfv6bubejhslkkuuvrvtdhmbm8h5mtira",
+        "https://dexscreener.com/solana/e6mjk4hqh7rxcftzkbreci59a7f4cymjwhylvwtf16xz",
       dexTools:
-        "https://www.dextools.io/app/en/solana/pair-explorer/Ce47Qs8rcKSPfV6BUbejHsLkKuUVRvtDHmBM8h5mtirA",
+        "https://www.dextools.io/app/en/solana/pair-explorer/14ij66BJz4Jn5i3vfPqE8RHzt2JSK5LXXzvgsagQAA4e?t=1711451732162&__cf_chl_rt_tk=gNL2pA00tZ66GUuHjxE89mx7NA0MCJpv5Kd7FQN8.a8-1711389900-0.0.1.1-1535",
       buy: "https://jup.ag/swap/SOL-ZOOMER_nBZEcHSG771mRbi4y2sSgKjfDUH8jsM2Eo5fNcASLeU",
       isCanonical: false,
       decimals: 8,
