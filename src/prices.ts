@@ -96,9 +96,9 @@ export const ZOOMER_MULTICHAIN: MultichainToken = {
       chain: solana,
       address: "nBZEcHSG771mRbi4y2sSgKjfDUH8jsM2Eo5fNcASLeU",
       dexScreener:
-        "https://dexscreener.com/solana/e6mjk4hqh7rxcftzkbreci59a7f4cymjwhylvwtf16xz",
+        "https://dexscreener.com/solana/14ij66bjz4jn5i3vfpqe8rhzt2jsk5lxxzvgsagqaa4e",
       dexTools:
-        "https://www.dextools.io/app/en/solana/pair-explorer/14ij66BJz4Jn5i3vfPqE8RHzt2JSK5LXXzvgsagQAA4e?t=1711451732162&__cf_chl_rt_tk=gNL2pA00tZ66GUuHjxE89mx7NA0MCJpv5Kd7FQN8.a8-1711389900-0.0.1.1-1535",
+        "https://www.dextools.io/app/en/solana/pair-explorer/14ij66BJz4Jn5i3vfPqE8RHzt2JSK5LXXzvgsagQAA4e?t=1717586758587",
       buy: "https://jup.ag/swap/SOL-ZOOMER_nBZEcHSG771mRbi4y2sSgKjfDUH8jsM2Eo5fNcASLeU",
       isCanonical: false,
       decimals: 8,
